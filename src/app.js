@@ -27,18 +27,13 @@ function calculateCashInFee(amount, config) {
 }
 
 function getWeekOfYear(date) {
-  const startOfYear = new Date(date.getFullYear(), 0, 1);
-  const days = Math.floor((date - startOfYear) / (24 * 60 * 60 * 1000)) + 1;
-  return Math.ceil(days / 7);
+  const firstDayOfYear = new Date(date.getFullYear(), 0, 1);
+  const pastDaysOfYear = (date - firstDayOfYear + (
+    (firstDayOfYear.getDay() + 6) % 7) * 86400000) / 86400000;
+  return Math.ceil((pastDaysOfYear + firstDayOfYear.getDay()) / 7);
 }
 
 function calculateCashOutNatural(amount, config, transactions, userId, date) {
-  if (!config || config.percents === undefined
-      || !config.week_limit || config.week_limit.amount === undefined
-  ) {
-    return { fee: 0, transactions };
-  }
-
   const currentWeek = getWeekOfYear(new Date(date));
   const userTransactions = transactions[userId] || {};
   const userWeekTransactions = userTransactions[currentWeek] || 0;
@@ -57,15 +52,17 @@ function calculateCashOutNatural(amount, config, transactions, userId, date) {
     fee = (taxableAmount * config.percents) / 100;
   }
 
+  const newTransactions = {
+    ...transactions,
+    [userId]: {
+      ...userTransactions,
+      [currentWeek]: totalWeekAmount,
+    },
+  };
+
   return {
     fee: Math.ceil(fee * 100) / 100,
-    transactions: {
-      ...transactions,
-      [userId]: {
-        ...userTransactions,
-        [currentWeek]: totalWeekAmount,
-      },
-    },
+    transactions: newTransactions,
   };
 }
 
@@ -109,7 +106,7 @@ async function main(inputFilePath) {
       default:
         console.log('Unsupported operation type');
     }
-    console.log(fee.toFixed(2));
+    console.log(`${fee.toFixed(2)}`);
   });
 }
 
